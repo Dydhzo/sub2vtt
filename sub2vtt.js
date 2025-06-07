@@ -163,6 +163,12 @@ class sub2vtt {
             }
             
             subtitleContent = iconv.decode(res, finalEncoding);
+
+            // Defensive check: ensure subtitleContent is a string before manipulation
+            if (typeof subtitleContent !== 'string') {
+                subtitleContent = subtitleContent.toString();
+            }
+
             // some subtitles have whitespaces in the end/ beginning of line
             subtitleContent = subtitleContent.split(/\r?\n/).map(row => row.trim()).join('\n');
             //-----------------------------------------
