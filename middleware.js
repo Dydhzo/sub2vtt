@@ -3,13 +3,14 @@ sub2vtt = require('./sub2vtt');
 module.exports = async (req, res) => {
 	try {
 
-		let url, proxy, type;
+		let url, proxy, type, lang;
 		if (req?.query?.proxy) proxy = JSON.parse(Buffer.from(req.query.proxy, 'base64').toString());
 		if (req?.query?.from) url = req.query.from
 		else throw 'error: no url';
-		console.log("url", url, "proxy", proxy)
+		if (req?.query?.lang) lang = req.query.lang;
+		console.log("url", url, "proxy", proxy, "lang", lang)
 
-		let sub = new sub2vtt(url, { proxy, type });
+		let sub = new sub2vtt(url, { proxy, type, lang });
 		//console.log(await sub.CheckUrl()) 
 		let file = await sub.getSubtitle();
 		//console.log(file)

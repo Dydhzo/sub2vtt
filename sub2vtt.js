@@ -4,18 +4,16 @@ const AdmZip = require('adm-zip');
 const axios = require('axios');
 
 const iconv = require('iconv-jschardet');
+const ENCODING_MAP = require('./encodings');
 iconv.skipDecodeWarning(true)
 iconv.disableCodecDataWarn(true)
 
-
-const iso639 = require('./ISO639');
-
-
 class sub2vtt {
     constructor(url, opts = {}) {
-        let { proxy, episode, type } = opts;
+        let { proxy, episode, type, lang } = opts;
         this.url = url;
         this.proxy = proxy || {};
+        this.lang = lang || null;
         this.data = null;
         this.size = null;
         this.error = null;
@@ -131,12 +129,13 @@ class sub2vtt {
 
 
 
-    async GetSub(data) {
+    async GetSub(inputData) {
+        let subtitleContent;
         try {
             let res;
 
-            if (data) {
-                res = data
+            if (inputData) {
+                res = inputData
             }
             else if (this.data) res = this.data
             else {
@@ -148,12 +147,24 @@ class sub2vtt {
                 if (res?.data) res = res.data
                 if (!res) throw "error requesting file"
             }
-            var data = iconv.encode(res, 'utf8').toString();
+            let detected = iconv.detect(res);
+            let finalEncoding = detected.encoding;
+            console.log(`Detected encoding: ${finalEncoding} with ${detected.confidence} confidence.`);
+
+            // If detection is not confident or not UTF-8, use our language map as a better fallback.
+            if (detected.confidence < 0.9 || (finalEncoding.toLowerCase() !== 'utf-8' && finalEncoding.toLowerCase() !== 'utf-16le')) {
+                const mappedEncoding = ENCODING_MAP[this.lang];
+                if (mappedEncoding) {
+                    console.log(`Language is '${this.lang}', falling back to mapped encoding: ${mappedEncoding}`);
+                    finalEncoding = mappedEncoding;
+                } else {
+                    console.log(`Language '${this.lang}' not in map, using original detection: ${finalEncoding}`);
+                }
+            }
+            
+            subtitleContent = iconv.decode(res, finalEncoding);
             // some subtitles have whitespaces in the end/ beginning of line
-            let fixdata = data
-            fixdata = fixdata.split(/\r?\n/)
-            fixdata = fixdata.map(row => row.trim())
-            data = fixdata.join('\n');
+            subtitleContent = subtitleContent.split(/\r?\n/).map(row => row.trim()).join('\n');
             //-----------------------------------------
             const outputExtension = '.vtt'; // conversion is based on output file extension
             const options = {
@@ -161,22 +172,22 @@ class sub2vtt {
                 startAtZeroHour: false,
                 timecodeOverlapLimiter: false,
             };
-            const { subtitle, status } = convert(data, outputExtension, options)
+            const { subtitle, status } = convert(subtitleContent, outputExtension, options)
             console.log(status)
-            if (subtitle) return { res: "success", subtitle: subtitle, status: status, res: data }
+            if (subtitle) return { res: "success", subtitle: subtitle, status: status, res: subtitleContent }
             if (status.success) return { res: "success", subtitle: subtitle, status: status, res: res }
             else return { res: "error", subtitle: null }
         } catch (err) {
             console.error(err);
             this.error = err;
-            return { res: "error", subtitle: data }
+            return { res: "error", subtitle: subtitleContent }
         }
     }
 
 
     supported = {
         arc: ["application/zip", "application/x-zip-compressed", "application/x-rar", "application/x-rar-compressed", "application/vnd.rar"],
-        subs: ["application/x-subrip", "text/vtt", "application/octet-stream"],
+        subs: ["application/x-subrip", "text/vtt", "application/octet-stream", "text/srt"],
         arcs: {
             rar: ["application/x-rar", "application/x-rar-compressed", "application/vnd.rar"],
             zip: ["application/zip", "application/x-zip-compressed"]
@@ -266,8 +277,8 @@ class sub2vtt {
 
         this.client = axios.create(config);
     }
-    static gerenateUrl(url = String, opts) {
-        let { proxy, type } = opts;
+    static gerenateUrl(url = String, opts = {}) {
+        let { proxy, lang } = opts;
         let proxyString, data;
         data = new URLSearchParams();
         data.append("from", url)
@@ -275,11 +286,8 @@ class sub2vtt {
             proxyString = Buffer.from(JSON.stringify(proxy)).toString('base64');
             data.append("proxy", proxyString)
         }
-        if (type) data.append("type", type);
+        if (lang) data.append("lang", lang);
         return data.toString();
-    }
-    static ISO() {
-        return iso639;
     }
 };
 
