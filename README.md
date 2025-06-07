@@ -1,4 +1,4 @@
-# sub2vtt v2.0
+# sub2vtt v2.0.0
 
 This version of `sub2vtt` has been specifically adapted and enhanced for the [gestdown-subtitles](https://github.com/Dydhzo/gestdown-subtitles) Stremio addon, with a focus on providing robust, language-aware character encoding conversion.
 
